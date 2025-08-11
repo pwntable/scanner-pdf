@@ -1,357 +1,82 @@
 <!doctype html>
 <html lang="ms">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Dokumen Scanner Web</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
-            padding: 12px;
-            background: #fafafa;
-            color: #111;
-            max-width: 720px;
-            margin: auto;
-        }
-
-        h1 {
-            font-size: 20px;
-            margin: 6px 0 12px;
-            text-align: center;
-        }
-
-        video, canvas {
-            width: 100%;
-            background: #000;
-            border-radius: 8px;
-        }
-
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-            justify-content: center;
-        }
-
-            .controls button, .controls label {
-                font-size: 14px;
-                padding: 8px 10px;
-                border-radius: 6px;
-                border: 1px solid #ccc;
-                background: #fff;
-                cursor: pointer;
-            }
-
-            .controls input[type="range"] {
-                width: 140px;
-            }
-
-        .thumbs {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-
-            .thumbs img {
-                width: 96px;
-                height: 128px;
-                object-fit: cover;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-
-        footer {
-            font-size: 12px;
-            color: #666;
-            margin-top: 16px;
-            text-align: center;
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dokumen Scanner Web</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; padding:12px; background:#fafafa; color:#111; max-width:720px; margin:auto; }
+  h1 { font-size:20px; margin:6px 0 12px; text-align:center; }
+  video, canvas { width:100%; background:#000; border-radius:8px; }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; justify-content:center; }
+  .controls button, .controls label { font-size:14px; padding:8px 10px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; }
+  .controls input[type="range"] { width:140px; }
+  .thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .thumbs img { width:96px; height:128px; object-fit:cover; border:1px solid #ddd; border-radius:4px; }
+  footer { font-size:12px; color:#666; margin-top:16px; text-align:center; }
+</style>
 </head>
 <body>
-    <h1>📄 Dokumen Scanner Web</h1>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+  <h1>📄 Dokumen Scanner Web</h1>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
 
-    <div class="controls">
-        <button id="startBtn">📷 Hidupkan Kamera</button>
-        <button id="captureBtn">📸 Tangkap</button>
-        <input id="fileInput" type="file" accept="image/*;capture=camera" style="display:none;">
-        <button id="uploadBtn">⬆️ Upload Gambar</button>
-        <label>Brightness <input id="bright" type="range" min="-100" max="100" value="0"></label>
-        <label>Contrast <input id="contrast" type="range" min="-100" max="100" value="0"></label>
-        <button id="bwBtn">⚫ Putih-Hitam</button>
-        <button id="sharpenBtn">✏️ Sharpen</button>
-        <button id="resetBtn">🔄 Reset</button>
-        <button id="addBtn">➕ Simpan Halaman</button>
-        <button id="exportBtn">💾 Eksport PDF</button>
-    </div>
+  <div class="controls">
+    <button id="startBtn" style="display:none;">📷 Hidupkan Kamera</button>
+    <button id="captureBtn">📸 Tangkap</button>
+    <input id="fileInput" type="file" accept="image/*;capture=camera" style="display:none;">
+    <button id="uploadBtn">⬆️ Upload Gambar</button>
+    <label>Brightness <input id="bright" type="range" min="-100" max="100" value="0"></label>
+    <label>Contrast <input id="contrast" type="range" min="-100" max="100" value="0"></label>
+    <button id="bwBtn">⚫ Putih-Hitam</button>
+    <button id="sharpenBtn">✏️ Sharpen</button>
+    <button id="resetBtn">🔄 Reset</button>
+    <button id="addBtn">➕ Simpan Halaman</button>
+    <button id="exportBtn">💾 Eksport PDF</button>
+  </div>
 
-    <h3>Koleksi Halaman:</h3>
-    <div class="thumbs" id="thumbs"></div>
+  <h3>Koleksi Halaman:</h3>
+  <div class="thumbs" id="thumbs"></div>
 
-    <footer>Semua proses dilakukan di peranti ini (offline). Tiada data dihantar ke server.</footer>
+  <footer>Semua proses dilakukan di peranti ini (offline). Tiada data dihantar ke server.</footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script>
-        (function () {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            const startBtn = document.getElementById('startBtn');
-            const captureBtn = document.getElementById('captureBtn');
-            const uploadBtn = document.getElementById('uploadBtn');
-            const fileInput = document.getElementById('fileInput');
-            const bright = document.getElementById('bright');
-            const contrast = document.getElementById('contrast');
-            const bwBtn = document.getElementById('bwBtn');
-            const sharpenBtn = document.getElementById('sharpenBtn');
-            const resetBtn = document.getElementById('resetBtn');
-            const addBtn = document.getElementById('addBtn');
-            const exportBtn = document.getElementById('exportBtn');
-            const thumbs = document.getElementById('thumbs');
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const startBtn = document.getElementById('startBtn');
 
-            let stream = null;
-            let currentImageData = null;
-            let collection = [];
+    let stream = null;
 
-            async function startCamera() {
-                if (stream) return;
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { exact: "environment" } }
-                    });
-                } catch (e) {
-                    // try without exact (some iPhones don't like exact)
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                    } catch (err) {
-                        console.warn('Camera failed:', err);
-                        alert('Camera tidak dapat diakses. Gunakan Upload Gambar sebagai fallback.');
-                        return;
-                    }
-                }
-                video.srcObject = stream;
-            }
+    async function startCamera(){
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+        startBtn.style.display = "none";
+      } catch (err) {
+        console.warn("Camera error:", err);
+        startBtn.style.display = "inline-block";
+      }
+    }
 
-            startBtn.addEventListener('click', startCamera);
+    // Auto start kamera masa page load
+    document.addEventListener('DOMContentLoaded', () => {
+      startCamera();
+    });
 
-            uploadBtn.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', (ev) => {
-                const f = ev.target.files[0];
-                if (!f) return;
-                const url = URL.createObjectURL(f);
-                loadImageFromURL(url);
-            });
+    // Kalau auto-start gagal, user boleh tekan manual
+    startBtn.addEventListener('click', startCamera);
 
-            function loadImageFromURL(url) {
-                const img = new Image();
-                img.onload = () => {
-                    setupCanvas(img.width, img.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    showCanvasPreview();
-                };
-                img.src = url;
-            }
-
-            function setupCanvas(w, h) {
-                // limit max size for perf
-                const maxW = 1400;
-                if (w > maxW) {
-                    const ratio = maxW / w;
-                    w = Math.round(w * ratio);
-                    h = Math.round(h * ratio);
-                }
-                canvas.width = w;
-                canvas.height = h;
-            }
-
-            function showCanvasPreview() {
-                canvas.style.display = 'block';
-                video.style.display = 'none';
-            }
-
-            captureBtn.addEventListener('click', () => {
-                if (!stream) {
-                    // fallback: open file picker
-                    fileInput.click();
-                    return;
-                }
-                // draw current video frame to canvas
-                const w = video.videoWidth;
-                const h = video.videoHeight;
-                setupCanvas(w, h);
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                applyFilters(); // initial apply
-                showCanvasPreview();
-            });
-
-            // Filter functions
-            function applyFilters() {
-                if (!currentImageData) return;
-                // clone
-                const imgData = new ImageData(new Uint8ClampedArray(currentImageData.data), currentImageData.width, currentImageData.height);
-                let data = imgData.data;
-                const b = parseInt(bright.value, 10); // -100..100
-                const c = parseInt(contrast.value, 10); // -100..100
-                // contrast formula
-                const factor = (259 * (c + 255)) / (255 * (259 - c));
-                for (let i = 0; i < data.length; i += 4) {
-                    // brightness
-                    data[i] = clamp(factor * (data[i] - 128) + 128 + b);     // R
-                    data[i + 1] = clamp(factor * (data[i + 1] - 128) + 128 + b); // G
-                    data[i + 2] = clamp(factor * (data[i + 2] - 128) + 128 + b); // B
-                }
-                ctx.putImageData(imgData, 0, 0);
-            }
-
-            function clamp(v) { return v < 0 ? 0 : (v > 255 ? 255 : Math.round(v)); }
-
-            bright.addEventListener('input', applyFilters);
-            contrast.addEventListener('input', applyFilters);
-
-            bwBtn.addEventListener('click', () => {
-                if (!currentImageData) return;
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const d = imgData.data;
-                for (let i = 0; i < d.length; i += 4) {
-                    const avg = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
-                    d[i] = d[i + 1] = d[i + 2] = avg;
-                }
-                ctx.putImageData(imgData, 0, 0);
-            });
-
-            sharpenBtn.addEventListener('click', () => {
-                if (!currentImageData) return;
-                // simple 3x3 sharpen kernel
-                const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-                convolution(kernel);
-            });
-
-            resetBtn.addEventListener('click', () => {
-                if (!currentImageData) return;
-                bright.value = 0; contrast.value = 0;
-                ctx.putImageData(currentImageData, 0, 0);
-            });
-
-            // convolution helper
-            function convolution(kernel) {
-                const w = canvas.width, h = canvas.height;
-                const src = ctx.getImageData(0, 0, w, h);
-                const dst = ctx.createImageData(w, h);
-                const k = kernel;
-                const kw = 3, kh = 3;
-                const half = Math.floor(kw / 2);
-                for (let y = 0; y < h; y++) {
-                    for (let x = 0; x < w; x++) {
-                        let r = 0, g = 0, b = 0, a = 0;
-                        for (let ky = 0; ky < kh; ky++) {
-                            for (let kx = 0; kx < kw; kx++) {
-                                const sx = x + kx - half;
-                                const sy = y + ky - half;
-                                if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
-                                    const idx = (sy * w + sx) * 4;
-                                    const kval = k[ky * kw + kx];
-                                    r += src.data[idx] * kval;
-                                    g += src.data[idx + 1] * kval;
-                                    b += src.data[idx + 2] * kval;
-                                    a += src.data[idx + 3] * kval;
-                                }
-                            }
-                        }
-                        const di = (y * w + x) * 4;
-                        dst.data[di] = clamp(r);
-                        dst.data[di + 1] = clamp(g);
-                        dst.data[di + 2] = clamp(b);
-                        dst.data[di + 3] = 255;
-                    }
-                }
-                ctx.putImageData(dst, 0, 0);
-            }
-
-            // add current canvas image to collection
-            addBtn.addEventListener('click', () => {
-                if (canvas.width === 0 || canvas.height === 0) return alert('Tiada gambar untuk tambah.');
-                const dataURL = canvas.toDataURL('image/jpeg', 0.92);
-                collection.push(dataURL);
-                renderThumbs();
-            });
-
-            function renderThumbs() {
-                thumbs.innerHTML = '';
-                collection.forEach((d, i) => {
-                    const img = document.createElement('img');
-                    img.src = d;
-                    img.title = 'Item ' + (i + 1);
-                    // remove on click
-                    img.addEventListener('click', () => {
-                        if (confirm('Buang imej ini dari koleksi?')) {
-                            collection.splice(i, 1);
-                            renderThumbs();
-                        }
-                    });
-                    thumbs.appendChild(img);
-                });
-            }
-
-            // Export PDF using jsPDF
-            exportBtn.addEventListener('click', async () => {
-                if (collection.length === 0) {
-                    // if no collection, maybe export current canvas
-                    if (canvas.width === 0) return alert('Tiada imej untuk eksport.');
-                    collection.push(canvas.toDataURL('image/jpeg', 0.92));
-                    renderThumbs();
-                }
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-                const A4w = 210, A4h = 297;
-                for (let i = 0; i < collection.length; i++) {
-                    const imgData = collection[i];
-                    // create image to get size
-                    const img = new Image();
-                    await new Promise((res, rej) => {
-                        img.onload = res;
-                        img.onerror = rej;
-                        img.src = imgData;
-                    });
-                    // fit to A4 with margin
-                    const margin = 10;
-                    const maxW = A4w - margin * 2;
-                    const maxH = A4h - margin * 2;
-                    let iw = img.width, ih = img.height;
-                    // convert px to mm approx: 96dpi -> 1px = 25.4/96 mm
-                    const pxToMm = 25.4 / 96;
-                    let mw = iw * pxToMm;
-                    let mh = ih * pxToMm;
-                    const ratio = Math.min(maxW / mw, maxH / mh);
-                    mw = mw * ratio; mh = mh * ratio;
-                    const x = (A4w - mw) / 2;
-                    const y = (A4h - mh) / 2;
-                    if (i > 0) pdf.addPage();
-                    pdf.addImage(imgData, 'JPEG', x, y, mw, mh);
-                }
-                // download
-                pdf.save('scans.pdf');
-            });
-
-            // ensure if page hidden we stop camera to save battery
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden && stream) {
-                    stream.getTracks().forEach(t => t.stop());
-                    stream = null;
-                    video.srcObject = null;
-                }
-            });
-
-            // start camera auto for convenience (try)
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                // don't auto-start on iOS to avoid unexpected permission popup, user must click Start Camera
-            }
-        })();
-    </script>
+    // Stop kamera bila page hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+        video.srcObject = null;
+      }
+    });
+  </script>
 </body>
 </html>
