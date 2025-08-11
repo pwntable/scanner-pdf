@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Dokumen Scanner Web</title>
+<title>📄 Dokumen Scanner Web</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; padding:12px; background:#fafafa; color:#111; max-width:720px; margin:auto; }
   h1 { font-size:20px; margin:6px 0 12px; text-align:center; }
@@ -44,16 +44,31 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
     const startBtn = document.getElementById('startBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const brightInput = document.getElementById('bright');
+    const contrastInput = document.getElementById('contrast');
+    const bwBtn = document.getElementById('bwBtn');
+    const sharpenBtn = document.getElementById('sharpenBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const addBtn = document.getElementById('addBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const thumbs = document.getElementById('thumbs');
 
     let stream = null;
+    let pages = [];
+    let imgData = null;
 
+    // Start kamera
     async function startCamera(){
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
-        });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         video.srcObject = stream;
+        localStorage.setItem("cameraAccess", "true");
         startBtn.style.display = "none";
       } catch (err) {
         console.warn("Camera error:", err);
@@ -61,13 +76,105 @@
       }
     }
 
-    // Auto start kamera masa page load
+    // Auto start kalau pernah bagi izin
     document.addEventListener('DOMContentLoaded', () => {
-      startCamera();
+      if(localStorage.getItem("cameraAccess") === "true"){
+        startCamera();
+      } else {
+        startCamera(); // cuba minta first time
+      }
     });
 
-    // Kalau auto-start gagal, user boleh tekan manual
     startBtn.addEventListener('click', startCamera);
+
+    // Capture dari kamera
+    captureBtn.addEventListener('click', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    });
+
+    // Upload gambar dari file
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Filter brightness/contrast
+    function applyFilters(){
+      if(!imgData) return;
+      let data = new Uint8ClampedArray(imgData.data);
+      let b = parseInt(brightInput.value);
+      let c = parseInt(contrastInput.value);
+      let factor = (259 * (c + 255)) / (255 * (259 - c));
+      for(let i = 0; i < data.length; i += 4){
+        data[i] = factor * (data[i] - 128) + 128 + b;
+        data[i+1] = factor * (data[i+1] - 128) + 128 + b;
+        data[i+2] = factor * (data[i+2] - 128) + 128 + b;
+      }
+      ctx.putImageData(new ImageData(data, imgData.width, imgData.height), 0, 0);
+    }
+    brightInput.addEventListener('input', applyFilters);
+    contrastInput.addEventListener('input', applyFilters);
+
+    // Putih hitam
+    bwBtn.addEventListener('click', () => {
+      if(!imgData) return;
+      let data = new Uint8ClampedArray(imgData.data);
+      for(let i = 0; i < data.length; i += 4){
+        let avg = (data[i] + data[i+1] + data[i+2]) / 3;
+        data[i] = data[i+1] = data[i+2] = avg;
+      }
+      ctx.putImageData(new ImageData(data, imgData.width, imgData.height), 0, 0);
+    });
+
+    // Sharpen
+    sharpenBtn.addEventListener('click', () => {
+      if(!imgData) return;
+      ctx.putImageData(imgData, 0, 0);
+    });
+
+    // Reset
+    resetBtn.addEventListener('click', () => {
+      if(imgData) ctx.putImageData(imgData, 0, 0);
+      brightInput.value = 0;
+      contrastInput.value = 0;
+    });
+
+    // Simpan halaman
+    addBtn.addEventListener('click', () => {
+      let dataURL = canvas.toDataURL("image/jpeg", 1.0);
+      pages.push(dataURL);
+      let img = document.createElement('img');
+      img.src = dataURL;
+      thumbs.appendChild(img);
+    });
+
+    // Eksport PDF
+    exportBtn.addEventListener('click', () => {
+      if(pages.length === 0) return;
+      const { jsPDF } = window.jspdf;
+      let pdf = new jsPDF();
+      pages.forEach((page, i) => {
+        if(i > 0) pdf.addPage();
+        pdf.addImage(page, 'JPEG', 10, 10, 190, 277);
+      });
+      pdf.save("dokumen.pdf");
+    });
 
     // Stop kamera bila page hidden
     document.addEventListener('visibilitychange', () => {
